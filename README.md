@@ -10,9 +10,10 @@
 
 ### Preprocessing (pt. 1)
 
-1. **Thresholding:** to get black&white images
-2. **Noise Reduction:** median filtering or gaussian filtering (compare results and choose the best one)
-
+1. **Brightness Adjustment**: try different brightness level to analyze final accuracy
+2. **Thresholding:** to get black&white images
+3. **Noise Reduction:** median filtering or gaussian filtering (compare results and choose the best one)
+   
 ### Decomposition of equations into symbols
 
 #### Method A
