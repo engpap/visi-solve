@@ -12,7 +12,8 @@
 
 1. **Thresholding:** to get black&white images
 2. **Noise Reduction:** median filtering or gaussian filtering (compare results and choose the best one)
-
+3. **Brightness Adjustment**: try different brightness level to analyze final accuracy
+   
 ### Decomposition of equations into symbols
 
 #### Method A
