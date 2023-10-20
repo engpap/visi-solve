@@ -10,7 +10,7 @@
 
 ### Preprocessing (pt. 1)
 
-1. **Brightness Adjustment**: try different brightness level to analyze final accuracy
+1. **Histogram Equalization**: to increase contrast
 2. **Thresholding:** to get black&white images
 3. **Noise Reduction:** median filtering or gaussian filtering (compare results and choose the best one)
    
