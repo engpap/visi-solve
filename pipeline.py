@@ -4,7 +4,6 @@ import copy
 import torch
 
 import numpy as np
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
 
@@ -12,19 +11,55 @@ from PIL import Image
 from torch.optim import Adam
 from collections import defaultdict 
 from sklearn.cluster import MeanShift, estimate_bandwidth
-from utils import SymbolCNN
+#from utils import SymbolCNN
+import torch.nn.functional as F
 
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from sklearn.model_selection import train_test_split
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.optim import Adam
 
-model_path = '/Users/matteoblack/Desktop/Proj/visi-solve/cnn/CNN_full_model_py.pth'
-PATH = '/Users/matteoblack/Desktop/Proj/visi-solve/dataset'
+MODEL_PATH = './cnn/CNN_full_model_jup.pth'
+DATASET_PATH = './dataset'
 NUM_EPOCHS = 30
+DEBUG = True
 
+'''
+- 2 Convolutional Layers with ReLU activation
+- Max pooling after each convolutional layer
+- 3 Fully Connected Layers (converting the 2D features into 1D for classification): ReLU for hidden layers; none on the output layer
+- Dropout after the first fully connected layer to prevent overfitting
+- Output: 14 neurons corresponding to the classes (digits and operators)
+'''
+class SymbolCNN(nn.Module):
+    def __init__(self):
+        super(SymbolCNN, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
+        # The input to the first fully connected layer will be 32*14*14
+        self.fc1 = nn.Linear(32 * 14 * 14, 64)
+        # The final layer has as many neurons as classes - the 10 digits, plus 4 operators
+        self.fc2 = nn.Linear(64, 14)
+
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.pool(x)
+        # Flatten the tensor
+        x = F.relu(self.conv2(x))
+        x = x.view(-1, 32 * 14 * 14)
+        x = F.relu(self.fc1(x))
+        # Apply dropout for regularization
+        x = F.dropout(x, training=self.training)
+        # No activation function is used in the output layer as it will be used in combination with the CrossEntropyLoss
+        x = self.fc2(x)
+        return x
+
+def debug_print(message):
+    if DEBUG:
+        print(message)
 
 def __threshold(img, threshold):
     for i in range(img.shape[0]):
@@ -149,7 +184,7 @@ def symbol_decomposition_v2(image):
         # adding some margin around symbol
         margin = 5
         symbol = image[y-margin:y+h+margin, x-margin:x+w+margin]
-        symbol = 255 - symbol
+        symbol = 255 - symbol 
         plt.imshow(symbol, cmap='gray')
         plt.axis('off')
         plt.savefig(f'tmp', bbox_inches='tight')
@@ -165,7 +200,8 @@ def make_prediction(symbols):
     labels = list()
 
     for image in symbols:
-        image = Image.fromarray(image, 'L')
+        # Convert the image to a PIL Image object
+        image = Image.fromarray(image, mode='L')
 
         # Define a transform to normalize the data
         transform = transforms.Compose([
@@ -182,7 +218,7 @@ def make_prediction(symbols):
         image_batch = transformed_image.unsqueeze(0).to(device)
 
         # Load the model
-        loaded_model = torch.load(model_path)
+        loaded_model = torch.load(MODEL_PATH)
         loaded_model.eval()
 
         # Get predictions from the model
@@ -222,15 +258,12 @@ def prepare_model():
     ])
 
     # Create a dataset from the folder structure
-    dataset = ImageFolder(PATH, transform=transform)
+    dataset = ImageFolder(DATASET_PATH, transform=transform)
 
     # Split the dataset into training and testing sets (80/20 split)
     train_size = int(0.8 * len(dataset))
     test_size = len(dataset) - train_size
     train_dataset, test_dataset = train_test_split(dataset, train_size=train_size, test_size=test_size, random_state=42)
-
-    #combined_train_dataset = ConcatDataset([mnist_train_dataset, train_dataset])
-    #combined_test_dataset = ConcatDataset([mnist_test_dataset, test_dataset])
 
     # Create DataLoader instances for training and testing
     batch_size = 32 
@@ -245,9 +278,6 @@ def prepare_model():
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate)
     print('Number of training batches', len(train_loader))
     print('Number of test batches', len(test_loader))
-
-    #print('Number of training samples', len(combined_train_dataset))
-    #print('Number of test samples', len(combined_test_dataset))
 
     # Initialize the model
     model = SymbolCNN.SymbolCNN()
@@ -267,8 +297,6 @@ def prepare_model():
     # Initialize lists to track the loss and accuracy
     train_losses = []
     train_accuracies = []
-    val_losses = []
-    val_accuracies = []
     test_losses = []
     test_accuracies = []
 
@@ -332,7 +360,7 @@ def prepare_model():
 
 
     # Save the entire model
-    torch.save(model, '/Users/matteoblack/Desktop/Proj/visi-solve/cnn/CNN_full_model.pth')
+    torch.save(model, MODEL_PATH)
 
     # Evaluate the model with the test data after training
     model.eval()  # Set the model to evaluation mode
@@ -357,8 +385,8 @@ def print_symbols(symbols):
         plt.clf()
 
 
-def main(filename):
-    eq = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2GRAY)
+def main(equation_filename):
+    eq = cv2.cvtColor(cv2.imread(equation_filename), cv2.COLOR_BGR2GRAY)
 
     #eq = noise_reduction_v1(eq)
     eq = noise_reduction_v2(eq)
@@ -368,9 +396,12 @@ def main(filename):
 
     print_symbols(symbols)
 
-    # prepare_model()
+    # If model file does not exist, train and save the model through `prepare_model()`
+    if not os.path.exists(MODEL_PATH):
+        prepare_model()
 
     labels = make_prediction(symbols)
+    debug_print(labels)
 
     formula, result = compute_result(labels)
 
@@ -394,5 +425,15 @@ def test():
 
 
 if __name__ == "__main__":
-    main('/Users/matteoblack/Desktop/Proj/visi-solve/equation-dataset/02_eq.png')
+    input_equation_filename = './equation-dataset/09_eq.png'
+    # 00: OK
+    # 01: NO (problem with NN) -> `3` recognized as `5`
+    # 02: NO (problem with preprocessing)
+    # 03: NO (problem with preprocessing and NN)
+    # 04: NO (problem with NN) -> `-` recognized as `+`
+    # 05: NO (problem with preprocessing) -> division sign is split into 3 symbols instead of 1
+    # 06: NO (problem with NN) -> `9` recognized ad `7`
+    # 07: OK
+
+    main(input_equation_filename)
     #test()
