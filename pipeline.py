@@ -81,7 +81,7 @@ def __cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding):
     return symbol
 
 
-def noise_reduction_v1(img, iteration=5, dim_kernel=10, threshold=128):
+def noise_reduction_v1(img, iteration=3, dim_kernel=10, threshold=128):
     __threshold(img, threshold)
 
     for i in range(iteration):
@@ -166,7 +166,7 @@ def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=1
     return symbols
 
 
-def symbol_decomposition_v2(image, margin=100, density_threshold=400):
+def symbol_decomposition_v2(image, margin=120, density_threshold=0.8):
     image = 255 - image
     # Find contours of the symbols
     contours, hierarchy = cv2.findContours(image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
@@ -189,9 +189,10 @@ def symbol_decomposition_v2(image, margin=100, density_threshold=400):
         
         symbol = __cutting_image(255 - image, y+h, y, x, x+w, margin)
 
-        debug_print(f'Number of points inside the image: {sum(symbol.flatten() == 0)}.')
+        density = 100 * sum(symbol.flatten() == 0) / len(symbol.flatten())
+        debug_print(f'Number of points inside the image: {density}.')
 
-        if sum(symbol.flatten() == 0) > density_threshold:
+        if density > density_threshold:
             plt.imshow(symbol, cmap='gray')
             plt.axis('off')
             plt.savefig(f'tmp', bbox_inches='tight')
@@ -443,7 +444,7 @@ def test():
 
 
 if __name__ == "__main__":
-    input_equation_filename = './equation-dataset/02_eq.png'
+    input_equation_filename = './equation-dataset/11_eq.png'
     # 00: NO -> NN (Maybe because written on iPad)
     # 01: NO -> NN (Maybe because written on iPad)
     # 02: NO -> NN
@@ -454,6 +455,8 @@ if __name__ == "__main__":
     # 07: OK -> Noise1 & Dec2
     # 08: OK -> Noise1 & Dec2
     # 09: OK -> Noise1 & Dec1-2
+    # 10: NO -> NN
+    # 11: NO -> NN
 
 
     main(input_equation_filename)
