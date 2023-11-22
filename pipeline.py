@@ -11,7 +11,6 @@ from PIL import Image
 from torch.optim import Adam
 from collections import defaultdict 
 from sklearn.cluster import MeanShift, estimate_bandwidth
-#from utils import SymbolCNN
 import torch.nn.functional as F
 
 from torch.utils.data import DataLoader
@@ -20,7 +19,7 @@ from sklearn.model_selection import train_test_split
 import torch.nn as nn
 from torch.optim import Adam
 
-MODEL_PATH = './cnn/CNN_full_model_jup.pth'
+MODEL_PATH = './cnn/CNN_full_model_py.pth'
 DATASET_PATH = './dataset'
 NUM_EPOCHS = 30
 DEBUG = True
@@ -57,14 +56,16 @@ class SymbolCNN(nn.Module):
         x = self.fc2(x)
         return x
 
+
 def debug_print(message):
     if DEBUG:
         print(message)
 
+
 def __threshold(img, threshold):
     for i in range(img.shape[0]):
         for j in range(img.shape[1]):
-            img[i,j] = 1 if img[i,j] > threshold else 0
+            img[i,j] = 255 if img[i,j] > threshold else 0
 
 
 def __cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding):
@@ -80,10 +81,10 @@ def __cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding):
     return symbol
 
 
-def noise_reduction_v1(img, iteration=5, dim_kernel=10, threshold=0.5):
+def noise_reduction_v1(img, iteration=5, dim_kernel=10, threshold=128):
     __threshold(img, threshold)
 
-    for _ in range(iteration):
+    for i in range(iteration):
         img = cv2.blur(img, (dim_kernel, dim_kernel))
         __threshold(img, threshold)
 
@@ -93,12 +94,12 @@ def noise_reduction_v1(img, iteration=5, dim_kernel=10, threshold=0.5):
 def noise_reduction_v2(image):
     # Apply Gaussian blurring and OTSU thresholding to binarize the image
     image = cv2.GaussianBlur(image,(5,5),0)
-    _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    _, binary_image = cv2.threshold(image, 255, 0, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     return binary_image
 
 
-def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=180, threshold_cluster=100, padding=20, cluster_distance_threshold=20):
+def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=180, threshold_cluster=100, padding=20, cluster_distance_threshold=60):
     symbols = list()
     dst = np.float32(img)
     dst = cv2.cornerHarris(dst, par1, par2, par3)
@@ -165,7 +166,8 @@ def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=1
     return symbols
 
 
-def symbol_decomposition_v2(image):
+def symbol_decomposition_v2(image, margin=100, density_threshold=400):
+    image = 255 - image
     # Find contours of the symbols
     contours, hierarchy = cv2.findContours(image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -182,14 +184,19 @@ def symbol_decomposition_v2(image):
     for contour in sorted_contours:
         x, y, w, h = cv2.boundingRect(contour)
         # adding some margin around symbol
-        margin = 5
-        symbol = image[y-margin:y+h+margin, x-margin:x+w+margin]
-        symbol = 255 - symbol 
-        plt.imshow(symbol, cmap='gray')
-        plt.axis('off')
-        plt.savefig(f'tmp', bbox_inches='tight')
-        symbols.append(cv2.cvtColor(cv2.imread('./tmp.png'), cv2.COLOR_BGR2GRAY))
-        os.remove('./tmp.png')
+        margin = margin
+        #symbol = image[y-margin:y+h+margin, x-margin:x+w+margin]
+        
+        symbol = __cutting_image(255 - image, y+h, y, x, x+w, margin)
+
+        debug_print(f'Number of points inside the image: {sum(symbol.flatten() == 0)}.')
+
+        if sum(symbol.flatten() == 0) > density_threshold:
+            plt.imshow(symbol, cmap='gray')
+            plt.axis('off')
+            plt.savefig(f'tmp', bbox_inches='tight')
+            symbols.append(cv2.cvtColor(cv2.imread('./tmp.png'), cv2.COLOR_BGR2GRAY))
+            os.remove('./tmp.png')
 
     return symbols
 
@@ -387,11 +394,22 @@ def print_symbols(symbols):
 
 def main(equation_filename):
     eq = cv2.cvtColor(cv2.imread(equation_filename), cv2.COLOR_BGR2GRAY)
+    print(f'Shape pre-noise: {eq.shape}.')
+    plt.imshow(eq, cmap='gray')
+    plt.axis('off')
+    plt.savefig(f'Eq-starting.png',  bbox_inches='tight')
+    plt.clf()
 
-    #eq = noise_reduction_v1(eq)
-    eq = noise_reduction_v2(eq)
+    eq = noise_reduction_v1(eq)
+    # eq = noise_reduction_v2(eq)
 
-    #symbols = symbol_decomposition_v1(eq)
+    print(f'Shape post-noise: {eq.shape}.')
+    plt.imshow(eq, cmap='gray')
+    plt.axis('off')
+    plt.savefig('Eq-processed.png',  bbox_inches='tight')
+    plt.clf()
+
+    # symbols = symbol_decomposition_v1(eq)
     symbols = symbol_decomposition_v2(eq)
 
     print_symbols(symbols)
@@ -425,15 +443,18 @@ def test():
 
 
 if __name__ == "__main__":
-    input_equation_filename = './equation-dataset/09_eq.png'
-    # 00: OK
-    # 01: NO (problem with NN) -> `3` recognized as `5`
-    # 02: NO (problem with preprocessing)
-    # 03: NO (problem with preprocessing and NN)
-    # 04: NO (problem with NN) -> `-` recognized as `+`
-    # 05: NO (problem with preprocessing) -> division sign is split into 3 symbols instead of 1
-    # 06: NO (problem with NN) -> `9` recognized ad `7`
-    # 07: OK
+    input_equation_filename = './equation-dataset/02_eq.png'
+    # 00: NO -> NN (Maybe because written on iPad)
+    # 01: NO -> NN (Maybe because written on iPad)
+    # 02: NO -> NN
+    # 03: OK -> Noise1 & Dec2
+    # 04: OK -> Noise1 & Dec2
+    # 05: NO -> contourns on the division
+    # 06: OK -> Noise1 & Dec2
+    # 07: OK -> Noise1 & Dec2
+    # 08: OK -> Noise1 & Dec2
+    # 09: OK -> Noise1 & Dec1-2
+
 
     main(input_equation_filename)
     #test()
