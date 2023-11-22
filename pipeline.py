@@ -108,20 +108,58 @@ def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=1
             min_val = min(clusters[keys[i + 1]][:, 0])
             right_cut = (max_val + min_val) // 2
 
-            symbols.append(__cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding))
+            symbol = __cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding)
+            plt.imshow(symbol, cmap='gray')
+            plt.axis('off')
+            plt.savefig(f'tmp', bbox_inches='tight')
+            symbols.append(cv2.cvtColor(cv2.imread('./tmp.png'), cv2.COLOR_BGR2GRAY))
+            os.remove('./tmp.png')
 
             left_cut = right_cut
             counter += 1
 
     right_cut = max(clusters[keys[-1]][:, 0]) + 5
 
-    symbols.append(__cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding))
+    symbol = __cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding)
+    plt.imshow(symbol, cmap='gray')
+    plt.axis('off')
+    plt.savefig(f'tmp', bbox_inches='tight')
+    symbols.append(cv2.cvtColor(cv2.imread('./tmp.png'), cv2.COLOR_BGR2GRAY))
+    os.remove('./tmp.png')
 
     return symbols
 
 
-def symbol_decomposition_v2():
-    ...
+def symbol_decomposition_v2(image):
+    # Apply Gaussian blurring and OTSU thresholding to binarize the image
+    _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # Find contours of the symbols
+    contours, hierarchy = cv2.findContours(binary_image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Initialize a list to hold the merged contours
+    merged_contours = []
+
+    # Look for the external contours & ignore the child contours
+    merged_contours = [contour for i, contour in enumerate(contours) if hierarchy[0][i][3] == -1]
+
+    # Sort the contours
+    sorted_contours = sorted(merged_contours, key=lambda ctr: cv2.boundingRect(ctr)[0])
+
+    symbols = []
+    for contour in sorted_contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        # adding some margin around symbol
+        margin = 5
+        symbol = binary_image[y-margin:y+h+margin, x-margin:x+w+margin]
+        symbol = 255 - symbol
+        plt.imshow(symbol, cmap='gray')
+        plt.axis('off')
+        plt.savefig(f'tmp', bbox_inches='tight')
+        symbols.append(cv2.cvtColor(cv2.imread('./tmp.png'), cv2.COLOR_BGR2GRAY))
+        os.remove('./tmp.png')
+
+    return symbols
 
 
 def make_prediction(symbols):
@@ -317,7 +355,8 @@ def prepare_model():
 def print_symbols(symbols):
     for counter, s in enumerate(symbols):
         plt.imshow(s, cmap='gray')
-        plt.savefig(f'digit{counter}')
+        plt.axis('off')
+        plt.savefig(f'digit{counter}',  bbox_inches='tight')
         plt.clf()
 
 
@@ -327,14 +366,10 @@ def main(filename):
     # eq = noise_reduction_v1(eq)
 
     # symbols = symbol_decomposition_v1(eq)
-
-    symbols = list()
-    for s in sorted(os.listdir('/Users/matteoblack/Desktop/Proj/visi-solve/test_data/')):
-        if s != '.DS_Store': 
-            # print(s)
-            symbols.append(cv2.cvtColor(cv2.imread(f'/Users/matteoblack/Desktop/Proj/visi-solve/test_data/{s}'), cv2.COLOR_BGR2GRAY))
+    symbols = symbol_decomposition_v2(eq)
 
     # print_symbols(symbols)
+    print(symbols[-1].shape)
 
     # prepare_model()
 
@@ -345,5 +380,22 @@ def main(filename):
     print(f'The result of {formula} is {result}.')
 
 
+def test():
+    symbols = list()
+    for s in sorted(os.listdir('/Users/matteoblack/Desktop/Proj/visi-solve/test_data_02/')):
+        if s != '.DS_Store': 
+            # print(s)
+            symbols.append(cv2.cvtColor(cv2.imread(f'/Users/matteoblack/Desktop/Proj/visi-solve/test_data_02/{s}'), cv2.COLOR_BGR2GRAY))
+
+    print(symbols[-1].shape)
+
+    labels = make_prediction(symbols)
+
+    formula, result = compute_result(labels)
+
+    print(f'The result of {formula} is {result}.')
+
+
 if __name__ == "__main__":
-    main('/Users/matteoblack/Desktop/Proj/visi-solve/symbol-decomposition/output03.png')
+    main('/Users/matteoblack/Desktop/Proj/visi-solve/equation-dataset/00_eq.png')
+    #test()
