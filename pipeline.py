@@ -52,15 +52,15 @@ def noise_reduction_v1(img, iteration=5, dim_kernel=10, threshold=0.5):
         img = cv2.blur(img, (dim_kernel, dim_kernel))
         __threshold(img, threshold)
 
-    plt.imshow(img) 
-    plt.savefig(f'why')
-    plt.clf()
-
     return img
 
 
-def noise_reduction_v2():
-    ...
+def noise_reduction_v2(image):
+    # Apply Gaussian blurring and OTSU thresholding to binarize the image
+    image = cv2.GaussianBlur(image,(5,5),0)
+    _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    return binary_image
 
 
 def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=180, threshold_cluster=100, padding=20, cluster_distance_threshold=20):
@@ -131,11 +131,8 @@ def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=1
 
 
 def symbol_decomposition_v2(image):
-    # Apply Gaussian blurring and OTSU thresholding to binarize the image
-    _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
     # Find contours of the symbols
-    contours, hierarchy = cv2.findContours(binary_image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
     # Initialize a list to hold the merged contours
     merged_contours = []
@@ -151,7 +148,7 @@ def symbol_decomposition_v2(image):
         x, y, w, h = cv2.boundingRect(contour)
         # adding some margin around symbol
         margin = 5
-        symbol = binary_image[y-margin:y+h+margin, x-margin:x+w+margin]
+        symbol = image[y-margin:y+h+margin, x-margin:x+w+margin]
         symbol = 255 - symbol
         plt.imshow(symbol, cmap='gray')
         plt.axis('off')
@@ -363,13 +360,13 @@ def print_symbols(symbols):
 def main(filename):
     eq = cv2.cvtColor(cv2.imread(filename), cv2.COLOR_BGR2GRAY)
 
-    # eq = noise_reduction_v1(eq)
+    #eq = noise_reduction_v1(eq)
+    eq = noise_reduction_v2(eq)
 
-    # symbols = symbol_decomposition_v1(eq)
+    #symbols = symbol_decomposition_v1(eq)
     symbols = symbol_decomposition_v2(eq)
 
-    # print_symbols(symbols)
-    print(symbols[-1].shape)
+    print_symbols(symbols)
 
     # prepare_model()
 
@@ -397,5 +394,5 @@ def test():
 
 
 if __name__ == "__main__":
-    main('/Users/matteoblack/Desktop/Proj/visi-solve/equation-dataset/00_eq.png')
+    main('/Users/matteoblack/Desktop/Proj/visi-solve/equation-dataset/02_eq.png')
     #test()
