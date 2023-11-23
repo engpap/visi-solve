@@ -232,9 +232,18 @@ def make_prediction(symbols):
         # Get predictions from the model
         with torch.no_grad():
             outputs = loaded_model(image_batch)
-            _, predicted = torch.max(outputs, 1)
-            labels.append(predicted.item())
-            # print(predicted.item())
+            probabilities = F.softmax(outputs, dim=1)
+            top_prob, predicted = torch.max(probabilities, 1)
+
+            # If prediction is less than 60% confidence, throw exception
+            if top_prob.item() < 0.6:
+                debug_print(f'Not reliable prediction -> Probabilities:')
+                for i, prob in enumerate(probabilities[0]):
+                    debug_print(f'{i}: {prob.item() * 100:.2f}%')
+                raise Exception(f'\nConfidence too low for reliable prediction - Got {top_prob.item() * 100:.2f}% confidence.\nTry with a better image.')
+            else:
+                debug_print(f'Predicted: {predicted.item()} with {top_prob.item() * 100:.2f}% confidence.')
+                labels.append(predicted.item())  
     
     return labels
 
@@ -395,7 +404,7 @@ def print_symbols(symbols):
 
 def main(equation_filename):
     eq = cv2.cvtColor(cv2.imread(equation_filename), cv2.COLOR_BGR2GRAY)
-    print(f'Shape pre-noise: {eq.shape}.')
+    debug_print(f'Shape pre-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
     plt.axis('off')
     plt.savefig(f'Eq-starting.png',  bbox_inches='tight')
@@ -404,7 +413,7 @@ def main(equation_filename):
     eq = noise_reduction_v1(eq)
     # eq = noise_reduction_v2(eq)
 
-    print(f'Shape post-noise: {eq.shape}.')
+    debug_print(f'Shape post-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
     plt.axis('off')
     plt.savefig('Eq-processed.png',  bbox_inches='tight')
@@ -419,9 +428,13 @@ def main(equation_filename):
     if not os.path.exists(MODEL_PATH):
         prepare_model()
 
-    labels = make_prediction(symbols)
-    debug_print(labels)
-
+    try:
+        labels = make_prediction(symbols)
+        debug_print(labels)
+    except Exception as e:
+        print(e)
+        return
+   
     formula, result = compute_result(labels)
 
     print(f'The result of {formula} is {result}.')
@@ -440,23 +453,24 @@ def test():
 
     formula, result = compute_result(labels)
 
-    print(f'The result of {formula} is {result}.')
+    print(f'\nThe result of {formula} is {result}.')
 
 
 if __name__ == "__main__":
-    input_equation_filename = './equation-dataset/11_eq.png'
+    input_equation_filename = './equation-dataset/12_eq.png'
     # 00: NO -> NN (Maybe because written on iPad)
     # 01: NO -> NN (Maybe because written on iPad)
     # 02: NO -> NN
     # 03: OK -> Noise1 & Dec2
     # 04: OK -> Noise1 & Dec2
     # 05: NO -> contourns on the division
-    # 06: OK -> Noise1 & Dec2
+    # 06: OK -> Noise1 & Dec2 (NOT IF CONFIDENCE SET)
     # 07: OK -> Noise1 & Dec2
     # 08: OK -> Noise1 & Dec2
     # 09: OK -> Noise1 & Dec1-2
     # 10: NO -> NN
     # 11: NO -> NN
+    # 12: NO -> NN
 
 
     main(input_equation_filename)
