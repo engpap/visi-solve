@@ -410,8 +410,8 @@ def main(equation_filename):
     plt.savefig(f'Eq-starting.png',  bbox_inches='tight')
     plt.clf()
 
-    eq = noise_reduction_v1(eq)
-    # eq = noise_reduction_v2(eq)
+    # eq = noise_reduction_v1(eq)
+    eq = noise_reduction_v2(eq)
 
     debug_print(f'Shape post-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
@@ -442,10 +442,10 @@ def main(equation_filename):
 
 def test():
     symbols = list()
-    for s in sorted(os.listdir('/Users/matteoblack/Desktop/Proj/visi-solve/test_data_02/')):
+    for s in sorted(os.listdir('./visi-solve/test_data_02/')):
         if s != '.DS_Store': 
             # print(s)
-            symbols.append(cv2.cvtColor(cv2.imread(f'/Users/matteoblack/Desktop/Proj/visi-solve/test_data_02/{s}'), cv2.COLOR_BGR2GRAY))
+            symbols.append(cv2.cvtColor(cv2.imread(f'./test_data_02/{s}'), cv2.COLOR_BGR2GRAY))
 
     print(symbols[-1].shape)
 
@@ -457,7 +457,8 @@ def test():
 
 
 if __name__ == "__main__":
-    input_equation_filename = './equation-dataset/12_eq.png'
+    # input_equation_filename = './equation-dataset/11_eq.png'
+    input_equation_filename = './equation-dataset/dark-background/1.png'
     # 00: NO -> NN (Maybe because written on iPad)
     # 01: NO -> NN (Maybe because written on iPad)
     # 02: NO -> NN
