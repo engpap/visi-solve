@@ -237,7 +237,8 @@ def make_prediction(symbols):
 
             # If prediction is less than 60% confidence, throw exception
             if top_prob.item() < 0.6:
-                debug_print(f'Not reliable prediction -> Probabilities:')
+                debug_print(f'\nSymbols predicted with confidence until now: {labels}')
+                debug_print(f'Not reliable prediction for the next symbol-> Probabilities:')
                 for i, prob in enumerate(probabilities[0]):
                     debug_print(f'{i}: {prob.item() * 100:.2f}%')
                 raise Exception(f'\nConfidence too low for reliable prediction - Got {top_prob.item() * 100:.2f}% confidence.\nTry with a better image.')
@@ -410,8 +411,8 @@ def main(equation_filename):
     plt.savefig(f'Eq-starting.png',  bbox_inches='tight')
     plt.clf()
 
-    # eq = noise_reduction_v1(eq)
-    eq = noise_reduction_v2(eq)
+    eq = noise_reduction_v1(eq)
+    #eq = noise_reduction_v2(eq)
 
     debug_print(f'Shape post-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
@@ -457,11 +458,12 @@ def test():
 
 
 if __name__ == "__main__":
-    # input_equation_filename = './equation-dataset/11_eq.png'
-    input_equation_filename = './equation-dataset/dark-background/1.png'
+    input_equation_filename = './equation-dataset/18_eq.png'
+    #input_equation_filename = './equation-dataset/dark-background/1.png'
+    
     # 00: NO -> NN (Maybe because written on iPad)
     # 01: NO -> NN (Maybe because written on iPad)
-    # 02: NO -> NN
+    # 02: OK -> Noise1 & Dec2
     # 03: OK -> Noise1 & Dec2
     # 04: OK -> Noise1 & Dec2
     # 05: NO -> contourns on the division
@@ -469,10 +471,13 @@ if __name__ == "__main__":
     # 07: OK -> Noise1 & Dec2
     # 08: OK -> Noise1 & Dec2
     # 09: OK -> Noise1 & Dec1-2
-    # 10: NO -> NN
+    # 10: Ok -> Noise1 & Dec2
     # 11: NO -> NN
-    # 12: NO -> NN
-
+    # 12: OK -> Noise1 & Dec2
+    # 13: NO BUT FAIR -> NN (reason: the 4 is not well written, seems a 9)
+    # 14: OK -> Noise1 & Dec2
+    # 16: NO -> PREPROCESSING NOT WORKING GOOD
+    # 17: NO -> PREPROCESSING NOT WORKING GOOD
 
     main(input_equation_filename)
     #test()
