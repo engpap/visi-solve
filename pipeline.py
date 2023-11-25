@@ -69,10 +69,10 @@ def __threshold(img, threshold):
 
 
 def __cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding):
-    zeros_v = np.zeros((upper_cut - bottom_cut, padding)) + 255
-    zeros_h = np.zeros((padding, right_cut - left_cut + 2 * padding)) + 255
-
     symbol = img[bottom_cut:upper_cut, left_cut:right_cut]
+    zeros_v = np.zeros((symbol.shape[0], padding)) + 255
+    zeros_h = np.zeros((padding, symbol.shape[1] + 2 * padding)) + 255
+
     symbol = np.c_[symbol, zeros_v]
     symbol = np.c_[zeros_v, symbol]
     symbol = np.vstack([symbol, zeros_h])
@@ -81,7 +81,7 @@ def __cutting_image(img, upper_cut, bottom_cut, left_cut, right_cut, padding):
     return symbol
 
 
-def noise_reduction_v1(img, iteration=3, dim_kernel=10, threshold=128):
+def noise_reduction_v1(img, iteration=2, dim_kernel=10, threshold=128):
     __threshold(img, threshold)
 
     for i in range(iteration):
@@ -94,9 +94,9 @@ def noise_reduction_v1(img, iteration=3, dim_kernel=10, threshold=128):
 def noise_reduction_v2(image):
     # Apply Gaussian blurring and OTSU thresholding to binarize the image
     image = cv2.GaussianBlur(image,(5,5),0)
-    _, binary_image = cv2.threshold(image, 255, 0, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
-    return binary_image
+    return 255 - binary_image
 
 
 def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=180, threshold_cluster=100, padding=20, cluster_distance_threshold=60):
@@ -166,29 +166,17 @@ def symbol_decomposition_v1(img, par1=2, par2=1, par3=0.0001, par4=0.001, par5=1
     return symbols
 
 
-def symbol_decomposition_v2(image, margin=120, density_threshold=0.8):
-    image = 255 - image
-    # Find contours of the symbols
-    contours, hierarchy = cv2.findContours(image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+def __contours_are_close(c1, c2):
+    x1, _, w1, _ = cv2.boundingRect(c1)
+    x2, _, _, _ = cv2.boundingRect(c2)
+    return x2 - (x1 + w1) < 10  
 
-    # Initialize a list to hold the merged contours
-    merged_contours = []
 
-    # Look for the external contours & ignore the child contours
-    merged_contours = [contour for i, contour in enumerate(contours) if hierarchy[0][i][3] == -1]
-
-    # Sort the contours
-    sorted_contours = sorted(merged_contours, key=lambda ctr: cv2.boundingRect(ctr)[0])
-
+def __extract_symbols(image, contours, density_threshold, margin):
     symbols = []
-    for contour in sorted_contours:
+    for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
-        # adding some margin around symbol
-        margin = margin
-        #symbol = image[y-margin:y+h+margin, x-margin:x+w+margin]
-        
-        symbol = __cutting_image(255 - image, y+h, y, x, x+w, margin)
-
+        symbol = __cutting_image(255 - image, y + h, y, x, x + w, margin)
         density = 100 * sum(symbol.flatten() == 0) / len(symbol.flatten())
         debug_print(f'Number of points inside the image: {density}.')
 
@@ -202,8 +190,39 @@ def symbol_decomposition_v2(image, margin=120, density_threshold=0.8):
     return symbols
 
 
+def symbol_decomposition_v2(image, margin=120, density_threshold=0.7):
+    image = 255 - image
+
+    # Find contours of the symbols
+    contours, hierarchy = cv2.findContours(image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Look for the external contours & ignore the child contours
+    merged_contours = [contour for i, contour in enumerate(contours) if hierarchy[0][i][3] == -1]
+
+    # Sort the contours
+    sorted_contours = sorted(merged_contours, key=lambda ctr: cv2.boundingRect(ctr)[0])
+
+    symbols = []
+    i = 0
+    while i < len(sorted_contours):
+        c1 = sorted_contours[i]
+        if i + 2 < len(sorted_contours):
+            c2 = sorted_contours[i + 1]
+            c3 = sorted_contours[i + 2]
+            if __contours_are_close(c1, c2) and __contours_are_close(c2, c3):
+                x, y, w, h = cv2.boundingRect(np.vstack([c1, c2, c3]))
+                symbols.append(np.array([[[x, y]], [[x + w, y]], [[x + w, y + h]], [[x, y + h]]]))
+                i += 3
+                continue
+
+        symbols.append(c1)
+        i += 1
+
+    return __extract_symbols(image, symbols, density_threshold, margin)
+
+
 def make_prediction(symbols):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     labels = list()
 
@@ -236,7 +255,7 @@ def make_prediction(symbols):
             top_prob, predicted = torch.max(probabilities, 1)
 
             # If prediction is less than 60% confidence, throw exception
-            if top_prob.item() < 0.6:
+            if sorted(probabilities[0])[-1] - sorted(probabilities[0])[-2] < 0.1:
                 debug_print(f'\nSymbols predicted with confidence until now: {labels}')
                 debug_print(f'Not reliable prediction for the next symbol-> Probabilities:')
                 for i, prob in enumerate(probabilities[0]):
@@ -298,14 +317,14 @@ def prepare_model():
     print('Number of test batches', len(test_loader))
 
     # Initialize the model
-    model = SymbolCNN.SymbolCNN()
+    model = SymbolCNN()
 
     # Loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=0.001)
 
     # Move the model to GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
     print("Device is:", device)
     print("-----------------------------------")
@@ -458,26 +477,25 @@ def test():
 
 
 if __name__ == "__main__":
-    input_equation_filename = './equation-dataset/18_eq.png'
+    input_equation_filename = './equation-dataset/16_eq.png'
     #input_equation_filename = './equation-dataset/dark-background/1.png'
     
-    # 00: NO -> NN (Maybe because written on iPad)
-    # 01: NO -> NN (Maybe because written on iPad)
+    # 01: OK -> Noise1 & Dec2
     # 02: OK -> Noise1 & Dec2
     # 03: OK -> Noise1 & Dec2
     # 04: OK -> Noise1 & Dec2
-    # 05: NO -> contourns on the division
-    # 06: OK -> Noise1 & Dec2 (NOT IF CONFIDENCE SET)
+    # 05: NO -> NN: 5 <-> 3
+    # 06: NO -> REJECT
     # 07: OK -> Noise1 & Dec2
     # 08: OK -> Noise1 & Dec2
     # 09: OK -> Noise1 & Dec1-2
-    # 10: Ok -> Noise1 & Dec2
-    # 11: NO -> NN
+    # 10: OK -> Noise1 & Dec2
+    # 11: OK -> Noise1 & Dec2
     # 12: OK -> Noise1 & Dec2
     # 13: NO BUT FAIR -> NN (reason: the 4 is not well written, seems a 9)
     # 14: OK -> Noise1 & Dec2
-    # 16: NO -> PREPROCESSING NOT WORKING GOOD
-    # 17: NO -> PREPROCESSING NOT WORKING GOOD
+    # 15: NO -> NN: 5 <-> 3
+    # 16: NO -> TOO MUCH NOISE
 
     main(input_equation_filename)
     #test()
