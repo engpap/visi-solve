@@ -19,7 +19,8 @@ from sklearn.model_selection import train_test_split
 import torch.nn as nn
 from torch.optim import Adam
 
-MODEL_PATH = './cnn/CNN_full_model_py.pth'
+# MODEL_PATH = './cnn/CNN_full_model_py.pth'
+MODEL_PATH = './cnn/CNN_full_model_jup.pth'
 DATASET_PATH = './dataset'
 NUM_EPOCHS = 30
 DEBUG = True
@@ -90,11 +91,61 @@ def noise_reduction_v1(img, iteration=2, dim_kernel=10, threshold=128):
 
     return img
 
+def remove_shadows(img):
+    # Generate the shadow of the image
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
+    shadow = cv2.dilate(img, kernel) # Make the background bleed into the text to cover it up
+    shadow = cv2.medianBlur(shadow, 21) # Use a median filter to cover up the text entirely (there may still be particles in the text), now we have an image with only the shadow
+    res = 255 - cv2.absdiff(img, shadow) # Remove the shadow from the original image
+    return res
+
+def adaptive_clean(img_path, load=True, mode='otsu'):
+    # Load image
+    if load:
+        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE).astype(np.uint8)
+    else:
+        img = img_path
+
+    # Convert to grayscale and apply Otsu's binarization for noise reduction
+    # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
+    img = cv2.GaussianBlur(img,(5,5),0)
+    if mode == 'otsu':
+        _, img = cv2.threshold(img,0,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # or you can use gaussian/mean adaptive thresholding
+    elif mode == 'mean':
+        img = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY,11,2)
+    elif mode == 'gaussian':
+        img = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+
+    img = 255 - img
+
+    # Can also apply some morphological transformations
+    # https://opencv24-python-tutorials.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html
+    kernel = np.ones((3, 3), dtype=np.uint8) # or you can use cv2.getStructuringElement()
+    img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
+    return img
+
+def clean_image(img_path, load=True):
+    if load:
+        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE).astype(np.uint8)
+    else:
+        img = img_path
+        
+    img = remove_shadows(img)
+
+    # As long as the lines aren't thick, we can remove the background lines
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    img = cv2.erode(img, kernel, iterations=1)
+
+    img = adaptive_clean(img, load=False)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    img = cv2.erode(img, kernel, iterations=1)
+
+    return img
 
 def noise_reduction_v2(image):
-    # Apply Gaussian blurring and OTSU thresholding to binarize the image
-    image = cv2.GaussianBlur(image,(5,5),0)
-    _, binary_image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    binary_image = clean_image(image, load=False)
 
     return 255 - binary_image
 
@@ -424,14 +475,15 @@ def print_symbols(symbols):
 
 def main(equation_filename):
     eq = cv2.cvtColor(cv2.imread(equation_filename), cv2.COLOR_BGR2GRAY)
+    # eq = cv2.imread(equation_filename, cv2.IMREAD_GRAYSCALE).astype(np.uint8)
     debug_print(f'Shape pre-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
     plt.axis('off')
     plt.savefig(f'Eq-starting.png',  bbox_inches='tight')
     plt.clf()
 
-    eq = noise_reduction_v1(eq)
-    #eq = noise_reduction_v2(eq)
+    # eq = noise_reduction_v1(eq)
+    eq = noise_reduction_v2(eq)
 
     debug_print(f'Shape post-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
@@ -477,8 +529,8 @@ def test():
 
 
 if __name__ == "__main__":
-    input_equation_filename = './equation-dataset/16_eq.png'
-    #input_equation_filename = './equation-dataset/dark-background/1.png'
+    # input_equation_filename = './equation-dataset/16_eq.png'
+    input_equation_filename = './equation-dataset/dark-background/5.png'
     
     # 01: OK -> Noise1 & Dec2
     # 02: OK -> Noise1 & Dec2
@@ -496,6 +548,24 @@ if __name__ == "__main__":
     # 14: OK -> Noise1 & Dec2
     # 15: NO -> NN: 5 <-> 3
     # 16: NO -> TOO MUCH NOISE
+
+    # For noise2:
+    # 01: NO -> Dec2: 4 <-> +, 5 <-> - Dec1: fails to decomp
+    # 02: OK -> Dec2, Dec1
+    # 03: OK -> Dec2, Dec1: fails to decomp
+    # 04: OK -> Dec1, Dec2: Issues with decomposition
+    # 05: NO -> Dec1: NN: 1 <-> 0, Dec2: NN: 5 <-> 3
+    # 06: NO -> Dec2: 7 <-> 1, 4 <-> + Dec1: 4 <-> +
+    # 07: NO -> 4 <-> +
+    # 08: OK -> Dec2
+    # 09: OK -> Dec1-2
+    # 10: OK -> Dec2, Dec1: fails to decomp, 1 <-> 0
+    # 11: OK -> Dec1-2
+    # 12: OK -> Dec1-2
+    # 13: OK -> Dec1-2
+    # 14: OK -> Dec1-2
+    # 15: NO -> Both fail to decompose
+    # 16: NO -> Dec1: decomposed symbols are all black Dec2: Fails to decompose
 
     main(input_equation_filename)
     #test()
