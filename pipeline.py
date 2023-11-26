@@ -128,7 +128,6 @@ def adaptive_clean(img_path, load=True, mode='otsu'):
         img = img_path
 
     # Convert to grayscale and apply Otsu's binarization for noise reduction
-    # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
     img = cv2.GaussianBlur(img,(5,5),0)
     if mode == 'otsu':
         _, img = cv2.threshold(img,0,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)
@@ -140,10 +139,11 @@ def adaptive_clean(img_path, load=True, mode='otsu'):
 
     img = 255 - img
 
-    # Can also apply some morphological transformations
-    # https://opencv24-python-tutorials.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html
+    # Apply morphological transformations to fill in holes in the symbols and make the text thicker
     kernel = np.ones((3, 3), dtype=np.uint8) # or you can use cv2.getStructuringElement()
     img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
+    img = cv2.dilate(img, kernel)
+
     return img
 
 def clean_image(img_path, load=True):
@@ -563,8 +563,8 @@ def test():
 
 
 if __name__ == "__main__":
-    # input_equation_filename = './equation-dataset/16_eq.png'
-    input_equation_filename = './equation-dataset/dark-background/5.png'
+    input_equation_filename = './equation-dataset/21_eq.png'
+    # input_equation_filename = './equation-dataset/dark-background/.png'
     
     # 01: OK -> Noise1 & Dec2
     # 02: OK -> Noise1 & Dec2
@@ -600,6 +600,10 @@ if __name__ == "__main__":
     # 14: OK -> Dec1-2
     # 15: NO -> Both fail to decompose
     # 16: NO -> Dec1: decomposed symbols are all black Dec2: Fails to decompose
+
+    # 19: Dec1: OK, Dec2: OK
+    # 20: Dec1: NO, Dec2: OK
+    # 21: Dec1: NO, Dec2: OK
 
     main(input_equation_filename)
     #test()
