@@ -1,4 +1,5 @@
 import os
+import argparse
 import cv2
 import copy
 import torch
@@ -19,11 +20,31 @@ from sklearn.model_selection import train_test_split
 import torch.nn as nn
 from torch.optim import Adam
 
+'''
+------ INSTRUCTIONS ------
+To run the pipeline:
+
+-n: noise reduction method
+    1: noise_reduction_v1
+    2: noise_reduction_v2
+-s: symbol decomposition method
+    1: symbol_decomposition_v1
+    2: symbol_decomposition_v2
+
+So, for example, to run the pipeline with noise reduction method 1 and symbol decomposition method 2:
+python pipeline.py -n 1 -s 2
+---------------------------
+'''
+
+
 # MODEL_PATH = './cnn/CNN_full_model_py.pth'
 MODEL_PATH = './cnn/CNN_full_model_jup.pth'
 DATASET_PATH = './dataset'
 NUM_EPOCHS = 30
 DEBUG = True
+
+
+
 
 '''
 - 2 Convolutional Layers with ReLU activation
@@ -474,16 +495,26 @@ def print_symbols(symbols):
 
 
 def main(equation_filename):
+    parser = argparse.ArgumentParser(description='VisiSolve', add_help=False)
+    parser.add_argument('-n', '--noise_reduction_version', default="1", help='Noise reduction version.')
+    parser.add_argument('-s', '--symbol_extraction_version', default="2", help='Symbol extraction version.')
+
+    args = parser.parse_args()
+    print("Arguments: {}".format(args))
+
     eq = cv2.cvtColor(cv2.imread(equation_filename), cv2.COLOR_BGR2GRAY)
-    # eq = cv2.imread(equation_filename, cv2.IMREAD_GRAYSCALE).astype(np.uint8)
     debug_print(f'Shape pre-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
     plt.axis('off')
     plt.savefig(f'Eq-starting.png',  bbox_inches='tight')
     plt.clf()
 
-    # eq = noise_reduction_v1(eq)
-    eq = noise_reduction_v2(eq)
+    if args.noise_reduction_version == "1":
+        eq = noise_reduction_v1(eq)
+    elif args.noise_reduction_version == "2":
+        eq = noise_reduction_v2(eq)
+    else:
+        raise Exception('Invalid noise reduction version.')
 
     debug_print(f'Shape post-noise: {eq.shape}.')
     plt.imshow(eq, cmap='gray')
@@ -491,8 +522,12 @@ def main(equation_filename):
     plt.savefig('Eq-processed.png',  bbox_inches='tight')
     plt.clf()
 
-    # symbols = symbol_decomposition_v1(eq)
-    symbols = symbol_decomposition_v2(eq)
+    if args.symbol_extraction_version == "1":
+        symbols = symbol_decomposition_v1(eq)
+    elif args.symbol_extraction_version == "2":
+        symbols = symbol_decomposition_v2(eq)
+    else:
+        raise Exception('Invalid symbol extraction version.')
 
     print_symbols(symbols)
 
@@ -510,7 +545,6 @@ def main(equation_filename):
     formula, result = compute_result(labels)
 
     print(f'The result of {formula} is {result}.')
-
 
 def test():
     symbols = list()
