@@ -498,6 +498,7 @@ def main(equation_filename):
     parser = argparse.ArgumentParser(description='VisiSolve', add_help=False)
     parser.add_argument('-n', '--noise_reduction_version', default="1", help='Noise reduction version.')
     parser.add_argument('-s', '--symbol_extraction_version', default="2", help='Symbol extraction version.')
+    parser.add_argument('-f', '--file_name', default=equation_filename, help='Name of file to process')
 
     args = parser.parse_args()
     print("Arguments: {}".format(args))
