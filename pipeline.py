@@ -37,6 +37,8 @@ python pipeline.py -n 1 -s 2
 '''
 
 
+# CNN_full_model_jup.pth is for CPU
+# CNN_full_model_py.pth is for Apple Silicon
 # MODEL_PATH = './cnn/CNN_full_model_py.pth'
 MODEL_PATH = './cnn/CNN_full_model_jup.pth'
 DATASET_PATH = './dataset'
@@ -496,12 +498,12 @@ def print_symbols(symbols):
 
 def main(equation_filename):
     parser = argparse.ArgumentParser(description='VisiSolve', add_help=False)
-    parser.add_argument('-n', '--noise_reduction_version', default="1", help='Noise reduction version.')
+    parser.add_argument('-n', '--noise_reduction_version', default="2", help='Noise reduction version.')
     parser.add_argument('-s', '--symbol_extraction_version', default="2", help='Symbol extraction version.')
     parser.add_argument('-f', '--file_name', default=equation_filename, help='Name of file to process')
 
     args = parser.parse_args()
-    print("Arguments: {}".format(args))
+    if DEBUG: print("Arguments: {}".format(args))
 
     eq = cv2.cvtColor(cv2.imread(equation_filename), cv2.COLOR_BGR2GRAY)
     debug_print(f'Shape pre-noise: {eq.shape}.')
@@ -565,7 +567,6 @@ def test():
 
 if __name__ == "__main__":
     input_equation_filename = './equation-dataset/21_eq.png'
-    # input_equation_filename = './equation-dataset/dark-background/.png'
     
     # 01: OK -> Noise1 & Dec2
     # 02: OK -> Noise1 & Dec2
@@ -605,6 +606,8 @@ if __name__ == "__main__":
     # 19: Dec1: OK, Dec2: OK
     # 20: Dec1: NO, Dec2: OK
     # 21: Dec1: NO, Dec2: OK
+
+    # Files in the equation-dataset/dark-background folder might not be good due to a different scale
 
     main(input_equation_filename)
     #test()
