@@ -31,19 +31,21 @@ To run the pipeline:
     1: symbol_decomposition_v1
     2: symbol_decomposition_v2
 
+-f: file name
+
 So, for example, to run the pipeline with noise reduction method 1 and symbol decomposition method 2:
-python pipeline.py -n 1 -s 2
+python pipeline.py -n 1 -s 2 -f ./21_eq.png
 ---------------------------
 '''
 
 
 # CNN_full_model_jup.pth is for CPU
 # CNN_full_model_py.pth is for Apple Silicon
-# MODEL_PATH = './cnn/CNN_full_model_py.pth'
-MODEL_PATH = './cnn/CNN_full_model_jup.pth'
+MODEL_PATH = './cnn/CNN_full_model_py.pth'
+#MODEL_PATH = './cnn/CNN_full_model_jup.pth'
 DATASET_PATH = './dataset'
 NUM_EPOCHS = 30
-DEBUG = True
+DEBUG = False
 
 
 
@@ -333,7 +335,7 @@ def make_prediction(symbols):
                 debug_print(f'\nSymbols predicted with confidence until now: {labels}')
                 debug_print(f'Not reliable prediction for the next symbol-> Probabilities:')
                 for i, prob in enumerate(probabilities[0]):
-                    debug_print(f'{i}: {prob.item() * 100:.2f}%')
+                    print(f'{i}: {prob.item() * 100:.2f}%')
                 raise Exception(f'\nConfidence too low for reliable prediction - Got {top_prob.item() * 100:.2f}% confidence.\nTry with a better image.')
             else:
                 debug_print(f'Predicted: {predicted.item()} with {top_prob.item() * 100:.2f}% confidence.')
@@ -387,8 +389,8 @@ def prepare_model():
     # Use the custom collate function in your DataLoader
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=custom_collate)
-    print('Number of training batches', len(train_loader))
-    print('Number of test batches', len(test_loader))
+    debug_print('Number of training batches', len(train_loader))
+    debug_print('Number of test batches', len(test_loader))
 
     # Initialize the model
     model = SymbolCNN()
@@ -400,8 +402,8 @@ def prepare_model():
     # Move the model to GPU if available
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     model.to(device)
-    print("Device is:", device)
-    print("-----------------------------------")
+    debug_print("Device is:", device)
+    debug_print("-----------------------------------")
 
     # Training the model
 
@@ -496,14 +498,19 @@ def print_symbols(symbols):
         plt.clf()
 
 
-def main(equation_filename):
+def main():
     parser = argparse.ArgumentParser(description='VisiSolve', add_help=False)
     parser.add_argument('-n', '--noise_reduction_version', default="2", help='Noise reduction version.')
     parser.add_argument('-s', '--symbol_extraction_version', default="2", help='Symbol extraction version.')
-    parser.add_argument('-f', '--file_name', default=equation_filename, help='Name of file to process')
+    parser.add_argument('-f', '--file_name', help='Name of file to process')
 
     args = parser.parse_args()
-    if DEBUG: print("Arguments: {}".format(args))
+    debug_print("Arguments: {}".format(args))
+
+    if args.file_name:
+        equation_filename = args.file_name
+    else:
+        raise Exception('No file name provided.')
 
     eq = cv2.cvtColor(cv2.imread(equation_filename), cv2.COLOR_BGR2GRAY)
     debug_print(f'Shape pre-noise: {eq.shape}.')
@@ -566,7 +573,6 @@ def test():
 
 
 if __name__ == "__main__":
-    input_equation_filename = './equation-dataset/21_eq.png'
     
     # 01: OK -> Noise1 & Dec2
     # 02: OK -> Noise1 & Dec2
@@ -609,5 +615,5 @@ if __name__ == "__main__":
 
     # Files in the equation-dataset/dark-background folder might not be good due to a different scale
 
-    main(input_equation_filename)
+    main()
     #test()
