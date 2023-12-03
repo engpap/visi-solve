@@ -29,7 +29,7 @@ Evaluated various neural network architectures:
 The project highlights the importance of advanced noise reduction, image preprocessing, and deep CNNs for the recognition of handwritten mathematical symbols. The deep CNN demonstrated the best performance in terms of accuracy and loss metrics.
 
 ## How to Run
-Use the following command to execute the noise reduction and symbol extraction on the specified image:
+Use the following command to execute the noise reduction and symbol extraction on the specified image:<br>
 ```python pipeline.py -n [Noise Reduction Version] -s [Symbol Extraction Version] -f [Image Path]```
 
 Example:
@@ -38,5 +38,7 @@ Example:
 ## References
 - Various references to methods and datasets used are included in the report.
 
-## Contact
-- Sebastian Ho, Matteo Negro, Andrea Paparella, Anup Raj, Dwij Shetty
+## Documentation
+- **Project Report**: [View the full project report here](https://github.com/engpap/visi-solve/blob/main/report.pdf)
+- **Presentation Slides**: [Access the presentation slides here](https://github.com/engpap/visi-solve/blob/main/slides.pdf)
+
