@@ -1,53 +1,42 @@
+# VisiSolve Project
 
-# VisiSolve: Vision-Based Equation Resolver
+## Introduction
+VisiSolve is a vision-based equation resolver that employs image processing and machine learning techniques to recognize handwritten mathematical equations. This project aims to overcome the challenges associated with interpreting handwritten symbols through a series of preprocessing steps and neural network evaluations.
 
-## Project Plan
+## Preprocessing
+### Image Cleaning
+- **Noise Reduction**: Two versions developed; basic thresholding and blurring (Version 1), and advanced techniques including shadow removal and adaptive thresholding (Version 2). Command-line execution with `-n` parameter to select the version.
+- **Brightness Adjustment**: Not included due to potential impairment of results.
+- **Histogram Equalization**: Tested but not optimal for preprocessing as it could amplify unwanted background features.
 
-### Data Collection
+### Segmentation
+- **Symbol Extraction**: Implemented in two versions; Mean Shift Clustering (Version 1) and Contour Detection (Version 2). Command-line execution with `-s` parameter to select the version.
+- **Results**: Version 2 (Contour Detection) proved more effective for symbol segmentation.
 
-- **Dataset of numbers and operators:** ready
-- **Dataset of equations:** can be done at the end
+### Standardization
+Transformed separated symbols into a consistent format for CNN processing, which involved centering and resizing symbols to a standard size of 28x28 pixels.
 
-### Preprocessing (pt. 1)
+## Image Recognition
+### Dataset
+A collection of handwritten mathematical operators and numbers, comprising 554 images per symbol, publicly available for use.
 
-1. **Histogram Equalization**: to increase contrast
-2. **Thresholding:** to get black&white images
-3. **Noise Reduction:** median filtering or gaussian filtering (compare results and choose the best one)
-   
-### Decomposition of equations into symbols
+### Experimentation & Analysis
+Evaluated various neural network architectures:
+- **Multi-layer Perceptrons (MLPs)**: Both shallow and deep architectures were tested.
+- **Convolutional Neural Networks (CNNs)**: Shallow and deep architectures were evaluated, with the deep CNN emerging as the superior model due to better generalization capabilities.
 
-#### Method A
+## Conclusion
+The project highlights the importance of advanced noise reduction, image preprocessing, and deep CNNs for the recognition of handwritten mathematical symbols. The deep CNN demonstrated the best performance in terms of accuracy and loss metrics.
 
-1. **Find contours:** 
-   - [OpenCV Contours Documentation](https://docs.opencv.org/3.4/d4/d73/tutorial_py_contours_begin.html)
-2. **Loop through contours:** to get symbols
+## How to Run
+Use the following command to execute the noise reduction and symbol extraction on the specified image:
+```python pipeline.py -n [Noise Reduction Version] -s [Symbol Extraction Version] -f [Image Path]```
 
-#### Method B
+Example:
+```python pipeline.py -n 1 -s 2 -f ./eq_rejected.png```
 
-1. **Use edge detection**
-2. **Separate symbols:** using clustering and previously obtained edges
+## References
+- Various references to methods and datasets used are included in the report.
 
-> **Note:** It could be cool to apply both methods (A and B) and compare results.
-
-### Preprocessing (pt. 2)
-
-1. **Make the image squared**
-2. **Center the symbols:** to improve training/prediction
-3. **Rescaling image:** to get a standard nxn matrix
-4. **Interpolation:** to make symbols denser, clearer for the NN (see if it's better here or in pt. 1)
-
-### Symbol Recognition
-
-Choose either one of the following methods:
-- **Create CNN**
-- **Create simple NN:** using multi-layer perceptron
-
-### Final Computation
-
-- **Calculate equation**
-
-### Final Testing to Get Pipeline Accuracy
-
-- **Write down some equations by hand and their associated results.** 
-- **Calculate accuracy for calculating equations.**
-
+## Contact
+- Sebastian Ho, Matteo Negro, Andrea Paparella, Anup Raj, Dwij Shetty
